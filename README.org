@@ -1,0 +1,10 @@
+#+TITLE: XBPS-GRAPHICAL
+
+* Installation
+  1. This requires sbcl with quicklisp. Make sure it is set up, and then clone this project to a place discoverable by quicklisp (typically =~/quicklisp/local-projects/=).
+  2. Run the script =make-executable.sh=.
+  3. copy the executable wherever you'd like. 
+     
+* FAQ
+** Why?
+   Well, why not? Its more a toy than anything, as xbps is already quite advanced.
