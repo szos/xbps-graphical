@@ -5,6 +5,9 @@
   2. Run the script =make-executable.sh=.
   3. copy the executable wherever you'd like. 
      
+* Usage
+  The general form of usage is to interact via the command interface (the interactor). However one can also use the mouse to click on things. Say you wish to install dillo, you can type =search dillo=, and all the search results will pop up. Clicking on one of these will install the program, or you can right click and select inspect to find out more information about it. 
+
 * FAQ
 ** Why?
    Well, why not? Its more a toy than anything, as xbps is already quite advanced.
