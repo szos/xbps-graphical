@@ -8,3 +8,8 @@
 * FAQ
 ** Why?
    Well, why not? Its more a toy than anything, as xbps is already quite advanced.
+** Why is the executable so big?
+   Unless you are running with a miniscule amount of ram and storage space, this shouldn't matter. But as to why, it because when making an executable with LISP, it contains the full lisp image, plus whatever else is loaded. 
+** How to contribute?
+   Grab the git repo, launch sly/slime (or vlime, if your not using emacs), and run ~(ql:quickload :xbps-graphical)~. 
+   Do note that as this is intended to be run with root privilidges, it should not be built with a swank/slynk server included. 
