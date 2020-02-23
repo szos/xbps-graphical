@@ -17,3 +17,4 @@
 
 (defun clean-orphaned-packages ()
   (xbps-remove "o"))
+
