@@ -14,4 +14,5 @@
   :components ((:file "package")
 	       (:file "xbps-query")
 	       (:file "xbps-install")
+	       (:file "xbps-remove")
                (:file "xbps-graphical")))
