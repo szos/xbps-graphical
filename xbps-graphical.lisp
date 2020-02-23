@@ -2,6 +2,15 @@
 
 (in-package #:xbps-graphical)
 
+(defclass xbps-package ()
+  ((name :initarg :name
+	 :accessor name)
+   (operation :initarg :operation
+	      :accessor operation)
+   (flags :initarg :flags
+	  :accessor flags
+	  :initfor "")))
+
 (defun make-xbps-graphical-executable ()
   (sb-ext:save-lisp-and-die "xbps-graphical"
 			    :toplevel (lambda ()
@@ -25,8 +34,10 @@
 					   (string-downcase
 					    (symbol-name program)))
 				      (and (stringp program) program))
-				  (or (and flags (concatenate 'string
-							      "-" flags " "))
+				  (or (and flags
+					   (< 0 (length flags))
+					   (concatenate 'string
+							"-" flags " "))
 				      "")
 				  args)
 			  :output stdout)
@@ -38,8 +49,14 @@
 	       ;; (with-end-of)
 	       (with-drawing-options (*standard-output* :ink +red+)
 		 (format t "Insufficient permissions to run “~a”, try running xbps-graphical as root.~%"
-			 command))))
-	(format nil "An error was encountered, errorcode ~a" code)))))
+			 command)))
+	      (t
+	       (error 'uiop:subprocess-error
+		      :process (uiop:subprocess-error-process err)
+		      :command (uiop:subprocess-error-command err)
+		      :code (uiop:subprocess-error-code err))))
+	;; (format nil "An error was encountered, errorcode ~a~%" code)
+	))))
 
 (defmacro bold ((stream) &body body)
   `(with-text-face (,stream :bold)
@@ -105,6 +122,30 @@
 (defun app-main ()
   (run-frame-top-level (make-application-frame 'xbps)))
 
+(define-presentation-type only-install-package-presentation ())
+
+(define-presentation-to-command-translator install-this-package
+    (only-install-package-presentation com-install-package xbps :gesture :select)
+    (obj)
+  (list obj))
+
+(define-presentation-type operate-on-package-presentation ())
+
+(define-presentation-to-command-translator inspect-package
+    (operate-on-package-presentation com-inspect-package xbps :gesture :select)
+    (obj)
+  (list obj))
+
+(define-presentation-to-command-translator install-package
+    (operate-on-package-presentation com-install-package xbps :gesture :select)
+    (obj)
+  (list obj))
+
+(define-presentation-to-command-translator remove-package
+    (operate-on-package-presentation com-remove-package xbps :gesture :select)
+    (obj)
+  (list obj))
+
 (define-xbps-command (com-quit :name "Exit") ()
   (frame-exit *application-frame*))
 
@@ -117,6 +158,14 @@
 				 s)
 		   (t () "an error occured"))))
 
+(define-xbps-command (com-smart-operation)
+    ((package package))
+  (if (not (listp (operation package)))
+      (xbps (operation package) (flags package) (name package))
+      (loop for op (operation package)
+	    for fl (flags package)
+	    do (xbps op fl (name package)))))
+
 (define-xbps-command (com-inspect-package :name "Inspect Package")
     ((package string :prompt "Package"))
   (let* ((res (xbps 'query "R"package))
@@ -126,7 +175,7 @@
       (italic (*standard-output*)
 	(format t "~a~%" package)))
     (with-output-as-presentation (*standard-output*
-				  package 'install-package-presentation
+				  package 'only-install-package-presentation
 				  :single-box t)
       (slim:with-table (*standard-output*)
 	(for-stream-lines (stream)
@@ -147,19 +196,28 @@
 			(format t "~{~a~}" end)))))))))
     (format t " ")))
 
+(define-xbps-command (com-remove-package :name "Remove Package")
+    ((package string :prompt "Package"))
+  (with-end-of-line-action (*standard-output* :wrap*)
+    (let ((res (remove-package package)))
+      (when res (format t "~a" res)))
+    (format t " ")))
+
 (define-xbps-command (com-install-package :name "Install Package")
     ((package string :prompt "Package"))
   (with-end-of-line-action (*standard-output* :wrap*)
     (let ((res (install-package package)))
       (when res
-	(format t "~a" res)))))
+	(format t "~a" res)))
+    (format t " ")))
 
 (define-xbps-command (com-update :name "Update System") ()
   (bold (*standard-output*)
     (format t "Updating System~%"))
   (let ((resp (xbps 'install "Suy")))
     (when resp
-      (format t "~a" resp))))
+      (format t "~a" resp))
+    (format t " ")))
 
 (define-xbps-command (com-update-test :name "test update system") ()
   (format t "~a" (xbps 'install "Su")))
@@ -168,13 +226,6 @@
   (bold (*standard-output*)
     (format t "Current Repositories:~%"))
   (format t "~a" (list-repositories)))
-
-(define-presentation-type install-package-only-presentation ())
-
-(define-presentation-to-command-translator install-this-package
-    (install-package-only-presentation com-install-package xbps :gesture :select)
-    (obj)
-  (list obj))
 
 (define-xbps-command (com-package-dependencies :name "Package Dependencies")
     ((name string :prompt "Package: "))
@@ -200,7 +251,7 @@
 		  for version in versions
 		  do (with-output-as-presentation (*standard-output*
 						   name
-						   'install-package-presentation
+						   'operate-on-package-presentation
 						   :single-box t)
 			 (slim:row
 			   (slim:cell (format t "~a" pkg))
@@ -209,18 +260,6 @@
 			   (slim:cell (format t " or higher"))))))
 	  (terpri))
 	(format t "No Package Named~%"))))
-
-(define-presentation-type install-package-presentation ())
-
-(define-presentation-to-command-translator inspect-package
-    (install-package-presentation com-inspect-package xbps :gesture :select)
-    (obj)
-  (list obj))
-
-(define-presentation-to-command-translator install-package
-    (install-package-presentation com-install-package xbps :gesture :select)
-    (obj)
-  (list obj))
 
 (define-xbps-command (com-search-for-package :name "Search")
     ((name string :prompt "Package: "))
@@ -249,16 +288,11 @@
 				 1)))
 		   (with-output-as-presentation (*standard-output*
 						 formatted-name
-						 'install-package-presentation
+						 'operate-on-package-presentation
 						 :single-box t)
 		     (slim:row
-		       (slim:cell (format t "~a" formatted-name))
 		       (slim:cell (format t "~a" installed))
 		       (slim:cell (format t "~a" name))
 		       (slim:cell (format t "~{~a ~}" description)))))) ))
-    ;; (xbps-table-output ((search-package-name name)
-    ;; 			*standard-output*
-    ;; 			name 'install-package-presentation
-    ;; 			:single-box t)
-    ;; 	(*standard-output*))
-    (format t " ")))
+    (format t " "))
+  (format t " "))
